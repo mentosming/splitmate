@@ -13,6 +13,7 @@ export default function Dashboard() {
     const [error, setError] = useState(null);
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [expandedTxId, setExpandedTxId] = useState(null);
+    const [imageErrors, setImageErrors] = useState(new Set());
 
     // Fetch Participants
     useEffect(() => {
@@ -198,8 +199,13 @@ export default function Dashboard() {
                                 )}>
                                     <div className="flex items-start gap-3 overflow-hidden">
                                         <div className="shrink-0">
-                                            {p.avatar_url ? (
-                                                <img src={p.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border border-white shadow-sm" />
+                                            {p.avatar_url && !imageErrors.has(p.id) ? (
+                                                <img
+                                                    src={p.avatar_url}
+                                                    alt=""
+                                                    className="w-10 h-10 rounded-full object-cover border border-white shadow-sm"
+                                                    onError={() => setImageErrors(prev => new Set(prev).add(p.id))}
+                                                />
                                             ) : (
                                                 <div className={cn(
                                                     "w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg",

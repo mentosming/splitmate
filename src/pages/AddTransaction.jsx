@@ -26,6 +26,7 @@ export default function AddTransaction() {
     // Mode 2 state
     const [totalAmount, setTotalAmount] = useState('');
     const [selectedIds, setSelectedIds] = useState(new Set());
+    const [imageErrors, setImageErrors] = useState(new Set());
 
     useEffect(() => {
         if (!currentTeam) return;
@@ -319,11 +320,16 @@ export default function AddTransaction() {
                                         )}
                                     >
                                         <div className="relative">
-                                            {p.avatar_url ? (
-                                                <img src={p.avatar_url} alt="" className={cn(
-                                                    "w-10 h-10 rounded-full object-cover border-2 shadow-sm transition-all",
-                                                    isSelected ? "border-indigo-400" : "border-transparent"
-                                                )} />
+                                            {p.avatar_url && !imageErrors.has(p.id) ? (
+                                                <img
+                                                    src={p.avatar_url}
+                                                    alt=""
+                                                    className={cn(
+                                                        "w-10 h-10 rounded-full object-cover border-2 shadow-sm transition-all",
+                                                        isSelected ? "border-indigo-400" : "border-transparent"
+                                                    )}
+                                                    onError={() => setImageErrors(prev => new Set(prev).add(p.id))}
+                                                />
                                             ) : (
                                                 <div className={cn(
                                                     "w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-sm transition-all",

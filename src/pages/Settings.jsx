@@ -21,6 +21,7 @@ export default function Settings() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
+    const [imageErrors, setImageErrors] = useState(new Set());
 
     const isAdmin = currentTeam?.admin_id === currentUser?.id;
 
@@ -294,8 +295,13 @@ export default function Settings() {
                                 <div key={p.id} className="bg-white border border-gray-200 rounded-xl p-3 flex items-center justify-between group hover:border-indigo-300 transition">
                                     <div className="flex items-center gap-3 overflow-hidden">
                                         <div className="relative shrink-0">
-                                            {p.avatar_url ? (
-                                                <img src={p.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border border-gray-100 shadow-sm" />
+                                            {p.avatar_url && !imageErrors.has(p.id) ? (
+                                                <img
+                                                    src={p.avatar_url}
+                                                    alt=""
+                                                    className="w-10 h-10 rounded-full object-cover border border-gray-100 shadow-sm"
+                                                    onError={() => setImageErrors(prev => new Set(prev).add(p.id))}
+                                                />
                                             ) : (
                                                 <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold">
                                                     {p.name.charAt(0)}
