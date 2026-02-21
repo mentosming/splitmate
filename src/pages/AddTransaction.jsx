@@ -312,17 +312,26 @@ export default function AddTransaction() {
                                         type="button"
                                         onClick={() => toggleParticipant(p.id)}
                                         className={cn(
-                                            "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-sm font-semibold",
+                                            "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-sm font-semibold h-full",
                                             isSelected
                                                 ? "border-indigo-500 bg-indigo-50 text-indigo-700"
                                                 : "border-gray-200 text-gray-400 hover:border-gray-300"
                                         )}
                                     >
-                                        <div className={cn(
-                                            "w-8 h-8 rounded-full flex items-center justify-center text-white font-black text-sm",
-                                            isSelected ? "bg-indigo-500" : "bg-gray-200"
-                                        )}>
-                                            {p.name.charAt(0)}
+                                        <div className="relative">
+                                            {p.avatar_url ? (
+                                                <img src={p.avatar_url} alt="" className={cn(
+                                                    "w-10 h-10 rounded-full object-cover border-2 shadow-sm transition-all",
+                                                    isSelected ? "border-indigo-400" : "border-transparent"
+                                                )} />
+                                            ) : (
+                                                <div className={cn(
+                                                    "w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-sm transition-all",
+                                                    isSelected ? "bg-indigo-500" : "bg-gray-200"
+                                                )}>
+                                                    {p.name.charAt(0)}
+                                                </div>
+                                            )}
                                         </div>
                                         <span className="truncate w-full text-center text-xs">{p.name}</span>
                                         {isSelected && totalAmountNum > 0 && (

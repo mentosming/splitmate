@@ -196,17 +196,31 @@ export default function Dashboard() {
                                     "p-4 rounded-xl border flex justify-between items-start",
                                     isPositive ? "bg-[#F0FDF4] border-[#DCFCE7]" : "bg-[#FEF2F2] border-[#FEE2E2]"
                                 )}>
-                                    <div>
-                                        <div className="text-sm font-medium text-gray-500 mb-1 truncate max-w-[150px]">{p.name}</div>
-                                        <div className={cn(
-                                            "text-2xl font-bold font-mono tracking-tight",
-                                            isPositive ? "text-[#059669]" : "text-[#DC2626]"
-                                        )}>
-                                            {isPositive ? '+' : ''}{balance.toFixed(2)}
+                                    <div className="flex items-start gap-3 overflow-hidden">
+                                        <div className="shrink-0">
+                                            {p.avatar_url ? (
+                                                <img src={p.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border border-white shadow-sm" />
+                                            ) : (
+                                                <div className={cn(
+                                                    "w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg",
+                                                    isPositive ? "bg-[#D1FAE5] text-[#059669]" : "bg-[#FEE2E2] text-[#DC2626]"
+                                                )}>
+                                                    {p.name.charAt(0)}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="overflow-hidden">
+                                            <div className="text-sm font-medium text-gray-500 mb-1 truncate">{p.name}</div>
+                                            <div className={cn(
+                                                "text-2xl font-bold font-mono tracking-tight",
+                                                isPositive ? "text-[#059669]" : "text-[#DC2626]"
+                                            )}>
+                                                {isPositive ? '+' : ''}{balance.toFixed(2)}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className={cn(
-                                        "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                                        "w-8 h-8 rounded-full flex items-center justify-center shrink-0 hidden sm:flex",
                                         isPositive ? "bg-[#D1FAE5] text-[#059669]" : "bg-[#FEE2E2] text-[#DC2626]"
                                     )}>
                                         <CircleDollarSign className="w-5 h-5" />

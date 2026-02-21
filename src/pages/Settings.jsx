@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Link as LinkIcon, CheckCircle, XCircle, Copy, AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { Users, Link as LinkIcon, CheckCircle, XCircle, Copy, AlertTriangle, Plus, Trash2, Camera } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -177,6 +177,41 @@ export default function Settings() {
         }
     };
 
+    const handleAvatarUpload = async (participantId, file) => {
+        if (!file || !currentTeam || !isAdmin) return;
+
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${participantId}-${Math.random()}.${fileExt}`;
+            const filePath = `${currentTeam.id}/${fileName}`;
+
+            // 1. Upload to Storage
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            // 2. Get Public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            // 3. Update Database
+            const { error: updateError } = await supabase
+                .from('participants')
+                .update({ avatar_url: publicUrl })
+                .eq('id', participantId);
+
+            if (updateError) throw updateError;
+
+            await fetchParticipants();
+        } catch (err) {
+            console.error("Avatar upload error:", err);
+            alert("圖片上傳失敗，請確認已在 Supabase 建立 'avatars' bucket。");
+        }
+    };
+
     const handleDeleteTeam = async () => {
         if (!currentTeam || !isAdmin) return;
         if (deleteConfirmText !== currentTeam.name) return;
@@ -257,11 +292,36 @@ export default function Settings() {
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                             {participants.map(p => (
                                 <div key={p.id} className="bg-white border border-gray-200 rounded-xl p-3 flex items-center justify-between group hover:border-indigo-300 transition">
-                                    <span className="font-medium text-gray-700 truncate">{p.name}</span>
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="relative shrink-0">
+                                            {p.avatar_url ? (
+                                                <img src={p.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border border-gray-100 shadow-sm" />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold">
+                                                    {p.name.charAt(0)}
+                                                </div>
+                                            )}
+                                            {isAdmin && (
+                                                <label className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition">
+                                                    <Camera className="w-4 h-4 text-white" />
+                                                    <input
+                                                        type="file"
+                                                        className="hidden"
+                                                        accept="image/*"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) handleAvatarUpload(p.id, file);
+                                                        }}
+                                                    />
+                                                </label>
+                                            )}
+                                        </div>
+                                        <span className="font-medium text-gray-700 truncate">{p.name}</span>
+                                    </div>
                                     {isAdmin && (
                                         <button
                                             onClick={() => handleRemoveParticipant(p)}
-                                            className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition focus:opacity-100"
+                                            className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition focus:opacity-100 shrink-0 ml-2"
                                             title="移除"
                                         >
                                             <Trash2 className="w-4 h-4" />
