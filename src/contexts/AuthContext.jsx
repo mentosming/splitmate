@@ -64,7 +64,7 @@ export function AuthProvider({ children }) {
                 admin_id: item.teams.admin_id,
                 created_at: item.teams.created_at,
                 member_status: item.status
-            })).filter(t => t.member_status === 'member'); // Only show active memberships
+            })).filter(t => t.member_status === 'member' || t.member_status === 'admin'); // Show both active members and admins
 
             setUserTeams(teamsData);
             return teamsData;

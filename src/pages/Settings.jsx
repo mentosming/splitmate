@@ -23,7 +23,9 @@ export default function Settings() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [imageErrors, setImageErrors] = useState(new Set());
 
-    const isAdmin = currentTeam?.admin_id === currentUser?.id;
+    const isOwner = currentTeam?.admin_id === currentUser?.id;
+    const currentUserStatus = members.find(m => m.id === currentUser?.id)?.status;
+    const isAdmin = isOwner || currentUserStatus === 'admin';
 
     const fetchMembers = useCallback(async () => {
         if (!currentTeam) return;
@@ -47,6 +49,7 @@ export default function Settings() {
 
             const active = data.filter(m => m.status === 'member' || m.status === 'admin').map(m => ({
                 id: m.user_id,
+                status: m.status,
                 ...m.profiles,
                 avatar_url: m.profiles?.avatar_url || m.profiles?.photo_url // Support both
             }));
@@ -135,6 +138,25 @@ export default function Settings() {
 
         if (error) alert("拒絕失敗");
         else await fetchMembers();
+    };
+
+    const handleToggleAdminStatus = async (userId, currentStatus) => {
+        if (!isOwner || userId === currentUser.id) return;
+
+        const newStatus = currentStatus === 'admin' ? 'member' : 'admin';
+
+        const { error } = await supabase
+            .from('team_members')
+            .update({ status: newStatus })
+            .eq('team_id', currentTeam.id)
+            .eq('user_id', userId);
+
+        if (error) {
+            console.error("Toggle admin status error:", error);
+            alert("更新權限失敗");
+        } else {
+            await fetchMembers();
+        }
     };
 
     const handleAddParticipant = async (e) => {
@@ -458,13 +480,28 @@ export default function Settings() {
                                     <div>
                                         <p className="font-semibold text-gray-800 flex items-center gap-2">
                                             {user.display_name || '未知用戶'}
-                                            {user.id === currentTeam.admin_id && (
-                                                <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">管理員</span>
-                                            )}
+                                            {user.id === currentTeam.admin_id ? (
+                                                <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full font-bold shadow-sm">擁有者</span>
+                                            ) : user.status === 'admin' ? (
+                                                <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold border border-indigo-200">管理員</span>
+                                            ) : null}
                                         </p>
                                         <p className="text-xs text-gray-500">{user.email}</p>
                                     </div>
                                 </div>
+                                {isOwner && user.id !== currentUser.id && (
+                                    <button
+                                        onClick={() => handleToggleAdminStatus(user.id, user.status)}
+                                        className={cn(
+                                            "text-xs font-semibold px-3 py-1.5 rounded-lg transition shrink-0 ml-2",
+                                            user.status === 'admin'
+                                                ? "text-red-600 bg-red-50 hover:bg-red-100"
+                                                : "text-indigo-600 bg-indigo-50 hover:bg-indigo-100"
+                                        )}
+                                    >
+                                        {user.status === 'admin' ? '取消管理員' : '設為管理員'}
+                                    </button>
+                                )}
                             </li>
                         ))}
                     </ul>
