@@ -153,7 +153,7 @@ export default function Settings() {
 
         if (error) {
             console.error("Toggle admin status error:", error);
-            alert("更新權限失敗");
+            alert(`更新權限失敗: ${error.message}`);
         } else {
             await fetchMembers();
         }
