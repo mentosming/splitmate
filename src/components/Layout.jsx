@@ -39,9 +39,9 @@ export default function Layout() {
                         {/* Left: Logo & Title */}
                         <div className="flex items-center gap-8">
                             <div className="flex items-center gap-3">
-                                <div className="text-indigo-600 font-black text-xl tracking-tight">團隊分帳</div>
-                                <div className="text-xs font-mono bg-gray-100 text-gray-500 px-2 py-1 rounded">
-                                    {currentTeam.id.slice(0, 5).toUpperCase()}
+                                <div className="text-indigo-600 font-black text-xl tracking-tight">SplitMate</div>
+                                <div className="text-xs font-semibold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg border border-indigo-100 max-w-[120px] truncate">
+                                    {currentTeam.name}
                                 </div>
                             </div>
 
