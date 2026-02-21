@@ -189,22 +189,34 @@ export default function Settings() {
             // 1. Upload to Storage
             const { error: uploadError } = await supabase.storage
                 .from('avatars')
-                .upload(filePath, file);
+                .upload(filePath, file, {
+                    upsert: true,
+                    cacheControl: '0' // Disable cache for the upload itself to ensure freshness
+                });
 
             if (uploadError) throw uploadError;
 
-            // 2. Get Public URL
+            // 2. Get Public URL & Add timestamp for cache busting
             const { data: { publicUrl } } = supabase.storage
                 .from('avatars')
                 .getPublicUrl(filePath);
 
+            const publicUrlWithTimestamp = `${publicUrl}?t=${Date.now()}`;
+
             // 3. Update Database
             const { error: updateError } = await supabase
                 .from('participants')
-                .update({ avatar_url: publicUrl })
+                .update({ avatar_url: publicUrlWithTimestamp })
                 .eq('id', participantId);
 
             if (updateError) throw updateError;
+
+            // 4. Clear error state for this participant so it tries to load again
+            setImageErrors(prev => {
+                const next = new Set(prev);
+                next.delete(participantId);
+                return next;
+            });
 
             await fetchParticipants();
         } catch (err) {
