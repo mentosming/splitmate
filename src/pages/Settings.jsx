@@ -211,6 +211,8 @@ export default function Settings() {
 
             if (updateError) throw updateError;
 
+            console.log("Avatar updated successfully. New URL:", publicUrlWithTimestamp);
+
             // 4. Clear error state for this participant so it tries to load again
             setImageErrors(prev => {
                 const next = new Set(prev);
@@ -312,7 +314,10 @@ export default function Settings() {
                                                     src={p.avatar_url}
                                                     alt=""
                                                     className="w-10 h-10 rounded-full object-cover border border-gray-100 shadow-sm"
-                                                    onError={() => setImageErrors(prev => new Set(prev).add(p.id))}
+                                                    onError={() => {
+                                                        console.error("Failed to load avatar for", p.name, ":", p.avatar_url);
+                                                        setImageErrors(prev => new Set(prev).add(p.id));
+                                                    }}
                                                 />
                                             ) : (
                                                 <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold">
