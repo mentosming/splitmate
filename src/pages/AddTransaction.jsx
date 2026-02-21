@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar } from 'lucide-react';
+import { Calendar, Zap, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function AddTransaction() {
@@ -12,11 +12,13 @@ export default function AddTransaction() {
     const [title, setTitle] = useState('');
     const [payerId, setPayerId] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [totalAmount, setTotalAmount] = useState('');
     const [splits, setSplits] = useState({});
+    const [selectedIds, setSelectedIds] = useState(new Set());
     const [loading, setLoading] = useState(false);
     const [participants, setParticipants] = useState([]);
 
-    // Fetch participants from database
+    // Fetch participants
     useEffect(() => {
         if (!currentTeam) return;
         const fetchParticipants = async () => {
@@ -24,43 +26,69 @@ export default function AddTransaction() {
                 .from('participants')
                 .select('*')
                 .eq('team_id', currentTeam.id);
-            if (!error) {
+            if (!error && data) {
                 setParticipants(data);
-                if (data.length > 0 && !payerId) {
-                    setPayerId(data[0].id);
-                }
+                // Default: all selected
+                setSelectedIds(new Set(data.map(p => p.id)));
+                if (data.length > 0) setPayerId(data[0].id);
             }
         };
         fetchParticipants();
     }, [currentTeam]);
 
-    const handleSplitChange = (participantId, amountStr) => {
-        const val = amountStr ? parseFloat(amountStr) : 0;
-        setSplits(prev => ({ ...prev, [participantId]: val }));
+    // Toggle participant selection
+    const toggleParticipant = (id) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+                setSplits(s => { const n = { ...s }; delete n[id]; return n; });
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
     };
+
+    const handleSplitChange = (id, val) => {
+        setSplits(prev => ({ ...prev, [id]: val ? parseFloat(val) : 0 }));
+    };
+
+    // One-tap even split
+    const handleEvenSplit = () => {
+        const total = parseFloat(totalAmount);
+        if (!total || selectedIds.size === 0) return;
+        const perPerson = parseFloat((total / selectedIds.size).toFixed(2));
+        const newSplits = {};
+        const ids = [...selectedIds];
+        ids.forEach((id, i) => {
+            // Give the last person any rounding remainder
+            if (i === ids.length - 1) {
+                const others = perPerson * (ids.length - 1);
+                newSplits[id] = parseFloat((total - others).toFixed(2));
+            } else {
+                newSplits[id] = perPerson;
+            }
+        });
+        setSplits(newSplits);
+    };
+
+    const splitTotal = useMemo(() =>
+        Object.entries(splits)
+            .filter(([id]) => selectedIds.has(id))
+            .reduce((sum, [, v]) => sum + (v || 0), 0),
+        [splits, selectedIds]
+    );
+
+    const totalAmountNum = parseFloat(totalAmount) || 0;
+    const isBalanced = totalAmount && Math.abs(splitTotal - totalAmountNum) < 0.01;
+    const canSubmit = title && payerId && date && totalAmountNum > 0 && isBalanced && selectedIds.size > 0;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const currentSplitTotal = Object.values(splits).reduce((sum, val) => sum + (val || 0), 0);
-
-        if (!title || !payerId || !date) {
-            alert('請填寫完整資訊');
-            return;
-        }
-
-        if (participants.length === 0) {
-            alert('沒有可參與分帳的名單！請先至「設定」頁面新增參與者。');
-            return;
-        }
-
-        if (currentSplitTotal <= 0) {
-            alert('總金額必須大於 0！');
-            return;
-        }
-
+        if (!canSubmit) return;
         setLoading(true);
         try {
-            // 1. Insert Transaction
             const { data: tx, error: txErr } = await supabase
                 .from('transactions')
                 .insert({
@@ -68,20 +96,18 @@ export default function AddTransaction() {
                     title,
                     date,
                     payer_id: payerId,
-                    total_amount: currentSplitTotal
+                    total_amount: totalAmountNum
                 })
                 .select()
                 .single();
-
             if (txErr) throw txErr;
 
-            // 2. Prepare and Insert Splits
-            const splitRows = Object.entries(splits)
-                .filter(([_, amount]) => amount > 0)
-                .map(([pId, amount]) => ({
+            const splitRows = [...selectedIds]
+                .filter(id => splits[id] > 0)
+                .map(id => ({
                     transaction_id: tx.id,
-                    participant_id: pId,
-                    amount: amount
+                    participant_id: id,
+                    amount: splits[id]
                 }));
 
             if (splitRows.length > 0) {
@@ -90,17 +116,13 @@ export default function AddTransaction() {
                     .insert(splitRows);
                 if (splitErr) throw splitErr;
             }
-
             navigate('/dashboard');
         } catch (error) {
-            console.error("Error creating transaction: ", error);
+            console.error('Error creating transaction:', error);
             alert('新增失敗，請重試');
             setLoading(false);
         }
     };
-
-    const currentSplitTotal = Object.values(splits).reduce((sum, val) => sum + (val || 0), 0);
-    const isValid = currentSplitTotal > 0;
 
     if (!currentTeam) return <div className="text-center py-20 text-gray-400">載入中...</div>;
 
@@ -110,7 +132,7 @@ export default function AddTransaction() {
             <div className="p-8 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div>
                     <h1 className="text-xl font-bold text-gray-800">新增帳目</h1>
-                    <p className="text-sm text-gray-500 mt-1">記錄一筆新消費。總金額會根據參與者的金額自動計算。</p>
+                    <p className="text-sm text-gray-500 mt-1">勾選參與者 → 輸入總金額 → 一鍵均攤或手動調整。</p>
                 </div>
                 {participants.length === 0 && (
                     <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-medium">
@@ -121,7 +143,7 @@ export default function AddTransaction() {
 
             <form onSubmit={handleSubmit} className="p-8 space-y-10">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-
+                    {/* Title */}
                     <div className="space-y-2 text-sm">
                         <label className="font-semibold text-gray-700 block">項目名稱</label>
                         <input
@@ -134,6 +156,7 @@ export default function AddTransaction() {
                         />
                     </div>
 
+                    {/* Date */}
                     <div className="space-y-2 text-sm">
                         <label className="font-semibold text-gray-700 block">日期</label>
                         <div className="relative">
@@ -148,6 +171,7 @@ export default function AddTransaction() {
                         </div>
                     </div>
 
+                    {/* Payer */}
                     <div className="space-y-2 text-sm">
                         <label className="font-semibold text-gray-700 block">誰先代付款項？</label>
                         <select
@@ -164,53 +188,125 @@ export default function AddTransaction() {
                         </select>
                     </div>
 
+                    {/* Total Amount */}
                     <div className="space-y-2 text-sm">
                         <label className="font-semibold text-gray-700 block">總金額</label>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">$</span>
                             <input
-                                type="text"
-                                value={currentSplitTotal.toFixed(2)}
-                                readOnly
-                                className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-8 pr-4 py-3 text-gray-500 font-bold outline-none cursor-not-allowed"
+                                type="number"
+                                inputMode="decimal"
+                                step="any"
+                                placeholder="0.00"
+                                value={totalAmount}
+                                onChange={e => setTotalAmount(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg pl-8 pr-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-bold text-gray-700"
                             />
                         </div>
                     </div>
-
                 </div>
 
                 <hr className="border-gray-100" />
 
+                {/* Participant Selection + Split */}
                 <div>
-                    <div className="mb-6 flex justify-between items-end">
+                    <div className="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div>
                             <h2 className="text-lg font-bold text-gray-800">各人分攤</h2>
-                            <p className="text-sm text-gray-500 mt-1">輸入每個人應付的金額。如果沒參加，請留空。</p>
+                            <p className="text-sm text-gray-500 mt-1">
+                                勾選參與者，再點「均攤」或手動填寫金額。
+                            </p>
                         </div>
-                        <div className="text-sm font-bold px-3 py-1.5 rounded-lg bg-[#F0FDF4] text-[#059669]">
-                            目前加總: ${currentSplitTotal.toFixed(2)}
+                        <div className="flex items-center gap-3">
+                            {/* Balance indicator */}
+                            {totalAmount && (
+                                <div className={cn(
+                                    "text-xs font-bold px-3 py-1.5 rounded-lg",
+                                    isBalanced
+                                        ? "bg-green-50 text-green-700"
+                                        : "bg-amber-50 text-amber-700"
+                                )}>
+                                    {isBalanced
+                                        ? `✓ 合計 $${splitTotal.toFixed(2)}`
+                                        : `合計 $${splitTotal.toFixed(2)} / $${totalAmountNum.toFixed(2)}`
+                                    }
+                                </div>
+                            )}
+                            {/* Even split button */}
+                            <button
+                                type="button"
+                                onClick={handleEvenSplit}
+                                disabled={!totalAmount || selectedIds.size === 0}
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-200 disabled:cursor-not-allowed text-white disabled:text-gray-400 text-sm font-bold rounded-lg transition"
+                            >
+                                <Zap className="w-4 h-4" />
+                                均攤 ({selectedIds.size} 人)
+                            </button>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-4">
-                        {participants.map(p => (
-                            <div key={p.id} className="flex items-center justify-between group">
-                                <span className="text-sm font-medium text-gray-700 truncate pr-4">{p.name}</span>
-                                <div className="relative w-36 shrink-0 transition-transform group-focus-within:scale-105">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                                    <input
-                                        type="number"
-                                        inputMode="decimal"
-                                        step="any"
-                                        placeholder="0.00"
-                                        value={splits[p.id] === 0 ? '' : splits[p.id] || ''}
-                                        onChange={(e) => handleSplitChange(p.id, e.target.value)}
-                                        className="w-full border border-gray-300 rounded-lg py-2 pl-7 pr-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-right font-medium text-gray-800"
-                                        disabled={participants.length === 0}
-                                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {participants.map(p => {
+                            const isSelected = selectedIds.has(p.id);
+                            return (
+                                <div
+                                    key={p.id}
+                                    className={cn(
+                                        "flex items-center gap-3 p-3 rounded-xl border-2 transition-all",
+                                        isSelected
+                                            ? "border-indigo-200 bg-indigo-50/50"
+                                            : "border-gray-100 bg-gray-50 opacity-60"
+                                    )}
+                                >
+                                    {/* Checkbox */}
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleParticipant(p.id)}
+                                        className={cn(
+                                            "w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all",
+                                            isSelected
+                                                ? "bg-indigo-600 border-indigo-600 text-white"
+                                                : "border-gray-300 bg-white"
+                                        )}
+                                    >
+                                        {isSelected && (
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        )}
+                                    </button>
+
+                                    <span className="text-sm font-semibold text-gray-700 flex-1 truncate">{p.name}</span>
+
+                                    {/* Amount input */}
+                                    <div className="relative w-28 shrink-0">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                                        <input
+                                            type="number"
+                                            inputMode="decimal"
+                                            step="any"
+                                            placeholder="0.00"
+                                            disabled={!isSelected}
+                                            value={isSelected ? (splits[p.id] || '') : ''}
+                                            onChange={(e) => handleSplitChange(p.id, e.target.value)}
+                                            className="w-full border border-gray-300 rounded-lg py-2 pl-7 pr-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-right font-medium text-gray-800 disabled:bg-gray-100 disabled:text-gray-400"
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
+                    </div>
+
+                    {/* Select All / None */}
+                    <div className="mt-3 flex gap-3">
+                        <button type="button" onClick={() => setSelectedIds(new Set(participants.map(p => p.id)))}
+                            className="text-xs text-indigo-600 hover:underline font-medium flex items-center gap-1">
+                            <Users className="w-3 h-3" /> 全選
+                        </button>
+                        <button type="button" onClick={() => { setSelectedIds(new Set()); setSplits({}); }}
+                            className="text-xs text-gray-400 hover:underline font-medium">
+                            全不選
+                        </button>
                     </div>
                 </div>
 
@@ -224,12 +320,10 @@ export default function AddTransaction() {
                     </button>
                     <button
                         type="submit"
-                        disabled={loading || !isValid || participants.length === 0}
+                        disabled={loading || !canSubmit}
                         className={cn(
                             "px-8 py-2.5 rounded-lg font-medium transition text-white shadow-sm flex items-center justify-center",
-                            isValid && participants.length > 0
-                                ? "bg-[#5F3DC3] hover:bg-[#4E32A1]"
-                                : "bg-gray-300 cursor-not-allowed"
+                            canSubmit ? "bg-[#5F3DC3] hover:bg-[#4E32A1]" : "bg-gray-300 cursor-not-allowed"
                         )}
                     >
                         {loading ? '儲存中...' : '儲存帳目'}
