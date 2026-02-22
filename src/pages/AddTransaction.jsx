@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, SplitSquareHorizontal, ListOrdered } from 'lucide-react';
+import { Calendar, SplitSquareHorizontal, ListOrdered, Camera, Upload, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 // Split mode constants
@@ -26,6 +26,10 @@ export default function AddTransaction() {
     // Mode 2 state
     const [totalAmount, setTotalAmount] = useState('');
     const [selectedIds, setSelectedIds] = useState(new Set());
+    // Receipt state
+    const [receiptFile, setReceiptFile] = useState(null);
+    const [receiptPreview, setReceiptPreview] = useState(null);
+    const [uploadingReceipt, setUploadingReceipt] = useState(false);
     const [imageErrors, setImageErrors] = useState(new Set());
 
     useEffect(() => {
@@ -67,6 +71,21 @@ export default function AddTransaction() {
     const isMode2Valid = mode === MODE_EVEN && title && payerId && date && totalAmountNum > 0 && selectedIds.size > 0;
     const canSubmit = isMode1Valid || isMode2Valid;
 
+    const handleFileChange = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setReceiptFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => setReceiptPreview(reader.result);
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const removeFile = () => {
+        setReceiptFile(null);
+        setReceiptPreview(null);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!canSubmit) return;
@@ -75,50 +94,112 @@ export default function AddTransaction() {
         const finalTotal = mode === MODE_MANUAL ? manualTotal : totalAmountNum;
 
         try {
+            let receiptUrl = null;
+            if (receiptFile) {
+                setUploadingReceipt(true);
+                const fileExt = receiptFile.name.split('.').pop();
+                const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
+                const filePath = `receipts/${currentTeam.id}/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('receipts')
+                    .upload(filePath, receiptFile);
+
+                if (uploadError) {
+                    console.error("Receipt upload error:", uploadError);
+                    // Continue without receipt if upload fails, or alert? User likely wants it.
+                    if (!confirm("單據上傳失敗，是否要繼續儲存帳目？")) {
+                        setLoading(false);
+                        setUploadingReceipt(false);
+                        return;
+                    }
+                } else {
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('receipts')
+                        .getPublicUrl(filePath);
+                    receiptUrl = publicUrl;
+                }
+            }
+
+            const transactionData = {
+                team_id: currentTeam.id,
+                title, date,
+                payer_id: payerId,
+                total_amount: finalTotal
+            };
+            if (receiptUrl) {
+                transactionData.receipt_url = receiptUrl;
+            }
+
             const { data: tx, error: txErr } = await supabase
                 .from('transactions')
-                .insert({
-                    team_id: currentTeam.id,
-                    title, date,
-                    payer_id: payerId,
-                    total_amount: finalTotal
-                })
+                .insert(transactionData)
                 .select()
                 .single();
-            if (txErr) throw txErr;
 
-            let splitRows = [];
-            if (mode === MODE_MANUAL) {
-                splitRows = Object.entries(splits)
-                    .filter(([, amount]) => amount > 0)
-                    .map(([id, amount]) => ({
-                        transaction_id: tx.id,
-                        participant_id: id,
-                        amount
-                    }));
-            } else {
-                const ids = [...selectedIds];
-                const perPerson = parseFloat((totalAmountNum / ids.length).toFixed(2));
-                splitRows = ids.map((id, i) => ({
-                    transaction_id: tx.id,
-                    participant_id: id,
-                    amount: i === ids.length - 1
-                        ? parseFloat((totalAmountNum - perPerson * (ids.length - 1)).toFixed(2))
-                        : perPerson
-                }));
+            if (txErr) {
+                // If receipt_url doesn't exist (PGRST204 is the Postgrest code for undefined column)
+                if (txErr.code === 'PGRST204' || txErr.code === '42703' || txErr.message?.includes('receipt_url')) {
+                    console.warn("receipt_url column missing, retrying without it...");
+                    const { data: retryTx, error: retryErr } = await supabase
+                        .from('transactions')
+                        .insert({
+                            team_id: currentTeam.id,
+                            title, date,
+                            payer_id: payerId,
+                            total_amount: finalTotal
+                        })
+                        .select()
+                        .single();
+
+                    if (retryErr) throw retryErr;
+
+                    // Proceed with splits using retryTx
+                    await saveSplits(retryTx);
+                    alert("帳目已儲存。提醒：由於資料庫缺少 'receipt_url' 欄位，單據連結未能紀錄。");
+                    return navigate('/dashboard');
+                }
+                throw txErr;
             }
 
-            if (splitRows.length > 0) {
-                const { error: splitErr } = await supabase
-                    .from('transaction_splits')
-                    .insert(splitRows);
-                if (splitErr) throw splitErr;
-            }
+            await saveSplits(tx);
             navigate('/dashboard');
         } catch (error) {
             console.error('Error creating transaction:', error);
-            alert('新增失敗，請重試');
+            alert('新增失敗：' + (error.message || '請重試'));
+        } finally {
             setLoading(false);
+            setUploadingReceipt(false);
+        }
+    };
+
+    const saveSplits = async (tx) => {
+        let splitRows = [];
+        if (mode === MODE_MANUAL) {
+            splitRows = Object.entries(splits)
+                .filter(([, amount]) => amount > 0)
+                .map(([id, amount]) => ({
+                    transaction_id: tx.id,
+                    participant_id: id,
+                    amount
+                }));
+        } else {
+            const ids = [...selectedIds];
+            const perPerson = parseFloat((totalAmountNum / ids.length).toFixed(2));
+            splitRows = ids.map((id, i) => ({
+                transaction_id: tx.id,
+                participant_id: id,
+                amount: i === ids.length - 1
+                    ? parseFloat((totalAmountNum - perPerson * (ids.length - 1)).toFixed(2))
+                    : perPerson
+            }));
+        }
+
+        if (splitRows.length > 0) {
+            const { error: splitErr } = await supabase
+                .from('transaction_splits')
+                .insert(splitRows);
+            if (splitErr) throw splitErr;
         }
     };
 
@@ -251,6 +332,42 @@ export default function AddTransaction() {
                             </div>
                         </div>
                     )}
+
+                    {/* Receipt Upload */}
+                    <div className="space-y-2 text-sm md:col-span-2">
+                        <label className="font-semibold text-gray-700 block">上傳單據 (選填)</label>
+                        <div className="flex items-center gap-4">
+                            {!receiptPreview ? (
+                                <label className="flex-1 border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:bg-indigo-50/30 transition cursor-pointer group">
+                                    <div className="w-10 h-10 rounded-full bg-gray-100 group-hover:bg-indigo-100 flex items-center justify-center text-gray-400 group-hover:text-indigo-600 transition">
+                                        <Camera className="w-5 h-5" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="font-medium text-gray-600">點擊上傳收據照片</p>
+                                        <p className="text-xs text-gray-400">支持 JPG, PNG 格式</p>
+                                    </div>
+                                    <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                                </label>
+                            ) : (
+                                <div className="flex-1 relative bg-gray-50 rounded-xl p-3 border border-gray-200 group">
+                                    <div className="flex items-center gap-4">
+                                        <img src={receiptPreview} alt="Receipt preview" className="w-16 h-16 rounded-lg object-cover border border-gray-200" />
+                                        <div className="flex-1 overflow-hidden">
+                                            <p className="text-sm font-bold text-gray-700 truncate">{receiptFile.name}</p>
+                                            <p className="text-xs text-gray-500">{(receiptFile.size / 1024).toFixed(1)} KB</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={removeFile}
+                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                                        >
+                                            <X className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 <hr className="border-gray-100" />

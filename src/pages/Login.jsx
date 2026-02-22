@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, UserCheck, ArrowRight, Globe, Wallet, Plane, Rocket, Layers, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
+import logo from '../assets/logo.png';
+
 export default function Login() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -111,9 +113,7 @@ export default function Login() {
             {/* Minimal Header */}
             <header className="px-6 py-8 sm:px-12 flex justify-between items-center max-w-7xl mx-auto w-full">
                 <div className="flex items-center gap-3 group">
-                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 group-hover:scale-105 transition-transform">
-                        <span className="text-xl font-black">G</span>
-                    </div>
+                    <img src={logo} alt="Logo" className="w-10 h-10 rounded-xl shadow-lg shadow-indigo-200 group-hover:scale-105 transition-transform object-cover" />
                     <h1 className="text-xl font-black tracking-tighter text-gray-900">SplitMate</h1>
                 </div>
                 <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-indigo-50 rounded-full border border-indigo-100">

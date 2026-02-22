@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { PlusCircle, RefreshCw, Download, Filter, CircleDollarSign, ChevronDown, ChevronUp, Trash2, Calendar, Lightbulb, ArrowLeftRight, Plane, Rocket } from 'lucide-react';
+import { PlusCircle, RefreshCw, Download, Filter, CircleDollarSign, ChevronDown, ChevronUp, Trash2, Calendar, Lightbulb, ArrowLeftRight, Plane, Rocket, Camera, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
@@ -325,7 +325,10 @@ export default function Dashboard() {
                                                     {isExpanded ? <ChevronUp className="w-4 h-4 text-indigo-500" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                                                 </div>
                                                 <div>
-                                                    <div className="font-bold text-gray-800">{tx.title}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="font-bold text-gray-800">{tx.title}</div>
+                                                        {tx.receipt_url && <Camera className="w-3.5 h-3.5 text-indigo-400" title="含有單據" />}
+                                                    </div>
                                                     <div className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider">{tx.date}</div>
                                                 </div>
                                             </div>
@@ -348,18 +351,35 @@ export default function Dashboard() {
 
                                         {isExpanded && (
                                             <div className="px-14 pb-4 pt-2 border-t border-gray-50 bg-gray-50/30 animate-in slide-in-from-top-2 duration-300">
-                                                <div className="flex flex-wrap gap-x-6 gap-y-2">
-                                                    {participants.map(p => {
-                                                        const split = tx.transaction_splits?.find(s => s.participant_id === p.id);
-                                                        const pAmount = split ? split.amount : 0;
-                                                        if (pAmount <= 0) return null;
-                                                        return (
-                                                            <div key={p.id} className="flex items-center gap-1.5 text-xs">
-                                                                <span className="text-gray-400 font-medium">{p.name}</span>
-                                                                <span className="font-bold text-indigo-600">${parseFloat(pAmount).toFixed(2)}</span>
-                                                            </div>
-                                                        );
-                                                    })}
+                                                <div className="flex flex-col gap-4">
+                                                    <div className="flex flex-wrap gap-x-6 gap-y-2">
+                                                        {participants.map(p => {
+                                                            const split = tx.transaction_splits?.find(s => s.participant_id === p.id);
+                                                            const pAmount = split ? split.amount : 0;
+                                                            if (pAmount <= 0) return null;
+                                                            return (
+                                                                <div key={p.id} className="flex items-center gap-1.5 text-xs">
+                                                                    <span className="text-gray-400 font-medium">{p.name}</span>
+                                                                    <span className="font-bold text-indigo-600">${parseFloat(pAmount).toFixed(2)}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    {tx.receipt_url && (
+                                                        <div className="pt-2 border-t border-gray-100/50">
+                                                            <a
+                                                                href={tx.receipt_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition shadow-sm"
+                                                            >
+                                                                <Camera className="w-3.5 h-3.5" />
+                                                                查看交易單據
+                                                                <ExternalLink className="w-3 h-3 opacity-50" />
+                                                            </a>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}

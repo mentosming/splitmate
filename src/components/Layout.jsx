@@ -5,6 +5,8 @@ import { LogOut, Home, PlusCircle, Settings, Users, ChevronDown, ChevronUp, Arro
 import { cn } from '../lib/utils';
 import { useState } from 'react';
 
+import logo from '../assets/logo.png';
+
 export default function Layout() {
     const { currentUser, currentTeam, userTeams, changeCurrentTeam } = useAuth();
     const navigate = useNavigate();
@@ -39,6 +41,7 @@ export default function Layout() {
                         {/* Left: Logo & Title */}
                         <div className="flex items-center gap-8">
                             <div className="flex items-center gap-3">
+                                <img src={logo} alt="Logo" className="w-8 h-8 rounded-lg object-cover" />
                                 <div className="text-indigo-600 font-black text-xl tracking-tight">SplitMate</div>
                                 <div className="text-xs font-semibold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg border border-indigo-100 max-w-[120px] truncate">
                                     {currentTeam.name}
