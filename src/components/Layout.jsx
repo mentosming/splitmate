@@ -1,7 +1,7 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { LogOut, Home, PlusCircle, Settings, Users, ChevronDown, ChevronUp, ArrowLeftRight } from 'lucide-react';
+import { LogOut, Home, PlusCircle, Settings, Users, ChevronDown, ChevronUp, ArrowLeftRight, ShieldAlert } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useState } from 'react';
 
@@ -74,6 +74,14 @@ export default function Layout() {
 
                         {/* Right: User Email & Team Switch */}
                         <div className="flex items-center gap-4">
+                            {currentUser?.email === 'ming1988@gmail.com' && (
+                                <Link
+                                    to="/admin"
+                                    className="hidden sm:flex items-center gap-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 px-3 py-1.5 rounded-lg text-xs font-bold transition border border-rose-100"
+                                >
+                                    <ShieldAlert className="w-3.5 h-3.5" /> 系統後台
+                                </Link>
+                            )}
                             <div className="hidden sm:block text-sm text-gray-600 font-medium">
                                 {currentUser?.email}
                             </div>

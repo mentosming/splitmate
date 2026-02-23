@@ -7,6 +7,7 @@ import AddTransaction from './pages/AddTransaction';
 import Settings from './pages/Settings';
 import TeamSetup from './pages/TeamSetup';
 import Repayment from './pages/Repayment';
+import AdminDashboard from './pages/AdminDashboard';
 import Layout from './components/Layout';
 
 // Enhanced Protected Route to check for both User and Team
@@ -39,6 +40,8 @@ const InviteHandler = () => {
   return null;
 };
 
+import PWAPrompt from './components/PWAPrompt';
+
 function AppRoutes() {
   const { currentUser, currentTeam, loading } = useAuth();
 
@@ -47,6 +50,7 @@ function AppRoutes() {
   return (
     <>
       <InviteHandler />
+      <PWAPrompt />
       <Routes>
         <Route path="/login" element={
           currentUser && !window.location.search.includes('invite')
@@ -57,6 +61,11 @@ function AppRoutes() {
         {/* Setup route for users to create or join teams */}
         <Route path="/setup" element={
           currentUser ? <TeamSetup /> : <Navigate to="/login" replace />
+        } />
+
+        {/* Super Admin Route */}
+        <Route path="/admin" element={
+          currentUser ? <AdminDashboard /> : <Navigate to="/login" replace />
         } />
 
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>

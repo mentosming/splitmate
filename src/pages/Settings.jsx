@@ -255,7 +255,16 @@ export default function Settings() {
 
         setIsDeleting(true);
         try {
-            // CASCADE DELETE will handle transactions, splits, participants, and members
+            // Manual CASCADE deletes
+            const { data: txs_to_delete } = await supabase.from('transactions').select('id').eq('team_id', currentTeam.id);
+            if (txs_to_delete && txs_to_delete.length > 0) {
+                const txIds = txs_to_delete.map(t => t.id);
+                await supabase.from('transaction_splits').delete().in('transaction_id', txIds);
+                await supabase.from('transactions').delete().eq('team_id', currentTeam.id);
+            }
+            await supabase.from('participants').delete().eq('team_id', currentTeam.id);
+            await supabase.from('team_members').delete().eq('team_id', currentTeam.id);
+
             const { error } = await supabase
                 .from('teams')
                 .delete()
