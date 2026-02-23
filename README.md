@@ -14,3 +14,9 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## PWA (Progressive Web App)
+
+This app is configured as a PWA, allowing users to install it to their home screens.
+- **Development**: Run `npm run dev --host` to test PWA installation on mobile devices within the same network.
+- **Production**: PWA features (like the installation prompt and service workers) are built automatically with `npm run build`.

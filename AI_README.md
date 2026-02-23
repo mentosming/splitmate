@@ -50,8 +50,13 @@
 
 ## 🚀 執行專案
 1. `npm install`
-2. `npm run dev`
+2. `npm run dev` (如果要讓區域網路的手機連上以測試 PWA，請在 package.json 使用 `--host` 參數)
 *(需要有包含 `VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY` 的 `.env` 或 `.env.local` 檔案)*
+
+## 📱 PWA (漸進式網頁應用程式)
+專案已整合 `vite-plugin-pwa`。
+- 提供自訂的 `PWAPrompt` 元件 (透過 `usePWA` hook)，當瀏覽器觸發 `beforeinstallprompt` 事件時，於畫面底部顯示安裝提示。針對 iOS Safari，則提供手動分享加入主畫面的指示。
+- 測試時建議使用 `npm run dev --host` 讓同網段裝置連線。
 
 ---
 *給 AI 助手：當繼續進行此專案的工作時，請使用本文件作為您的主要上下文，在進行修改前了解架構和領域模型。*
