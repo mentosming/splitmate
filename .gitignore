@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Migration Scripts (Sensitive)
+migrate_supabase.py
+migrate_storage.py
+inspect_schema.py
