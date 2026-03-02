@@ -159,6 +159,27 @@ export default function Settings() {
         }
     };
 
+    const handleRemoveMember = async (member) => {
+        if (!isOwner || member.id === currentUser.id) return;
+
+        const confirmMsg = `確定要移除協作者 ${member.display_name || member.email} 嗎？此操作將取消其對此團隊的所有存取權限。`;
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            const { error } = await supabase
+                .from('team_members')
+                .delete()
+                .eq('team_id', currentTeam.id)
+                .eq('user_id', member.id);
+
+            if (error) throw error;
+            await fetchMembers();
+        } catch (err) {
+            console.error("Remove member error:", err);
+            alert("移除失敗");
+        }
+    };
+
     const handleAddParticipant = async (e) => {
         e.preventDefault();
         if (!newParticipantName.trim() || !currentTeam || !isAdmin) return;
@@ -490,19 +511,30 @@ export default function Settings() {
                                         <p className="text-xs text-gray-500">{user.email}</p>
                                     </div>
                                 </div>
-                                {isOwner && user.id !== currentUser.id && (
-                                    <button
-                                        onClick={() => handleToggleAdminStatus(user.id, user.status)}
-                                        className={cn(
-                                            "text-xs font-semibold px-3 py-1.5 rounded-lg transition shrink-0 ml-2",
-                                            user.status === 'admin'
-                                                ? "text-red-600 bg-red-50 hover:bg-red-100"
-                                                : "text-indigo-600 bg-indigo-50 hover:bg-indigo-100"
-                                        )}
-                                    >
-                                        {user.status === 'admin' ? '取消管理員' : '設為管理員'}
-                                    </button>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    {isOwner && user.id !== currentUser.id && (
+                                        <>
+                                            <button
+                                                onClick={() => handleToggleAdminStatus(user.id, user.status)}
+                                                className={cn(
+                                                    "text-xs font-semibold px-3 py-1.5 rounded-lg transition shrink-0",
+                                                    user.status === 'admin'
+                                                        ? "text-red-600 bg-red-50 hover:bg-red-100"
+                                                        : "text-indigo-600 bg-indigo-50 hover:bg-indigo-100"
+                                                )}
+                                            >
+                                                {user.status === 'admin' ? '取消管理員' : '設為管理員'}
+                                            </button>
+                                            <button
+                                                onClick={() => handleRemoveMember(user)}
+                                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition shrink-0"
+                                                title="移除協作者"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
                             </li>
                         ))}
                     </ul>
