@@ -81,14 +81,27 @@ export function AuthProvider({ children }) {
                 return [];
             }
 
-            // Transform nested result to flat structure
-            const teamsData = data.map(item => ({
-                id: item.teams.id,
-                name: item.teams.name,
-                admin_id: item.teams.admin_id,
-                created_at: item.teams.created_at,
-                member_status: item.status
-            })).filter(t => t.member_status === 'member' || t.member_status === 'admin'); // Show both active members and admins
+            // Transform nested result to flat structure and deduplicate by team id
+            const deduplicatedMap = new Map();
+            data.forEach(item => {
+                const team = item.teams;
+                if (!team) return;
+
+                // If already found, prefer 'admin' or 'member' status over 'pending' if applicable
+                // (though filter already removes pending, this is safe for future changes)
+                if (!deduplicatedMap.has(team.id) || item.status === 'admin') {
+                    deduplicatedMap.set(team.id, {
+                        id: team.id,
+                        name: team.name,
+                        admin_id: team.admin_id,
+                        created_at: team.created_at,
+                        member_status: item.status
+                    });
+                }
+            });
+
+            const teamsData = Array.from(deduplicatedMap.values())
+                .filter(t => t.member_status === 'member' || t.member_status === 'admin');
 
             setUserTeams(teamsData);
             return teamsData;
