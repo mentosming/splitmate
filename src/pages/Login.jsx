@@ -50,6 +50,28 @@ export default function Login() {
         }
     }, [inviteTeamId]);
 
+    const [existingStatus, setExistingStatus] = useState(null); // 'member', 'pending', or null
+
+    useEffect(() => {
+        if (currentUser && inviteTeamId) {
+            const checkMembership = async () => {
+                const { data, error } = await supabase
+                    .from('team_members')
+                    .select('status')
+                    .eq('team_id', inviteTeamId)
+                    .eq('user_id', currentUser.id)
+                    .maybeSingle();
+
+                if (data) {
+                    setExistingStatus(data.status);
+                } else {
+                    setExistingStatus(null);
+                }
+            };
+            checkMembership();
+        }
+    }, [currentUser, inviteTeamId]);
+
     const handleConfirmJoin = async () => {
         if (!inviteTeamId || !currentUser) return;
         setJoining(true);
@@ -57,6 +79,8 @@ export default function Login() {
         try {
             const success = await joinTeam(inviteTeamId);
             if (success) {
+                // Refresh status after joining
+                setExistingStatus('pending');
                 navigate('/setup');
             } else {
                 setError('找不到受邀團隊。');
@@ -198,14 +222,36 @@ export default function Login() {
                                     </div>
                                 </div>
 
-                                <button
-                                    onClick={handleConfirmJoin}
-                                    disabled={joining || !invitedTeamName}
-                                    className="group/btn w-full flex items-center justify-center py-4 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-all active:scale-[0.98] shadow-lg shadow-indigo-200"
-                                >
-                                    <span>{joining ? '正在加入...' : '加入此團隊'}</span>
-                                    {!joining && <ArrowRight className="ml-2 w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />}
-                                </button>
+                                {existingStatus === 'pending' ? (
+                                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 text-center">
+                                        <p className="text-amber-800 font-bold text-sm mb-3">加入申請審核中</p>
+                                        <button
+                                            onClick={() => navigate('/setup')}
+                                            className="w-full flex items-center justify-center py-3 px-6 rounded-xl bg-white border border-amber-200 text-amber-700 text-xs font-bold hover:bg-amber-100 transition shadow-sm"
+                                        >
+                                            查看我的團隊
+                                        </button>
+                                    </div>
+                                ) : existingStatus === 'member' || existingStatus === 'admin' ? (
+                                    <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 text-center">
+                                        <p className="text-emerald-800 font-bold text-sm mb-3">您已是此團隊成員</p>
+                                        <button
+                                            onClick={() => navigate('/setup')}
+                                            className="w-full flex items-center justify-center py-3 px-6 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition shadow-sm shadow-emerald-100"
+                                        >
+                                            立即進入儀表板
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={handleConfirmJoin}
+                                        disabled={joining || !invitedTeamName}
+                                        className="group/btn w-full flex items-center justify-center py-4 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-all active:scale-[0.98] shadow-lg shadow-indigo-200"
+                                    >
+                                        <span>{joining ? '正在加入...' : '加入此團隊'}</span>
+                                        {!joining && <ArrowRight className="ml-2 w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />}
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             <div className="space-y-4">

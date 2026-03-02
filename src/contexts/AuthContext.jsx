@@ -13,18 +13,42 @@ export function AuthProvider({ children }) {
     const [currentTeam, setCurrentTeam] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // Sync User Profile to Database
+    const syncProfile = async (user) => {
+        if (!user) return;
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .upsert({
+                    id: user.id,
+                    display_name: user.user_metadata?.full_name || user.email?.split('@')[0],
+                    email: user.email,
+                    avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.photo_url,
+                    updated_at: new Date().toISOString(),
+                }, { onConflict: 'id' });
+
+            if (error) console.error("Profile sync error:", error);
+        } catch (err) {
+            console.error("Profile sync catch:", err);
+        }
+    };
+
     // Watch Authentication State
     useEffect(() => {
         // Initial session check
         supabase.auth.getSession().then(({ data: { session } }) => {
-            setCurrentUser(session?.user ?? null);
+            const user = session?.user ?? null;
+            setCurrentUser(user);
+            if (user) syncProfile(user);
             setLoading(false);
         });
 
         // Listen for changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setCurrentUser(session?.user ?? null);
-            if (!session?.user) {
+            const user = session?.user ?? null;
+            setCurrentUser(user);
+            if (user) syncProfile(user);
+            if (!user) {
                 setUserTeams([]);
                 setCurrentTeam(null);
             }
@@ -135,6 +159,9 @@ export function AuthProvider({ children }) {
         if (!currentUser || !teamId) return false;
 
         try {
+            // Ensure profile exists for admin to see
+            await syncProfile(currentUser);
+
             // Check if team exists
             const { data: team, error: teamErr } = await supabase
                 .from('teams')
@@ -150,7 +177,7 @@ export function AuthProvider({ children }) {
                 .select('status')
                 .eq('team_id', teamId)
                 .eq('user_id', currentUser.id)
-                .single();
+                .maybeSingle(); // Use maybeSingle to avoid 406 error if not found
 
             if (!membership) {
                 // Submit join request

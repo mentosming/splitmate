@@ -443,7 +443,7 @@ export default function Settings() {
                                         <Users className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <p className="font-semibold text-gray-800">{user.display_name || '未知用戶'}</p>
+                                        <p className="font-semibold text-gray-800">{user.display_name || user.email || '未知用戶'}</p>
                                         <p className="text-xs text-gray-500">{user.email}</p>
                                     </div>
                                 </div>
